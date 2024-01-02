@@ -3,6 +3,7 @@
     "description": "A minimal implementation of Yandex Disk Api",
     "homepage": "https://github.com/pavel-macovschi/yandex-disk-api",
     "license": "MIT",
+    "minimum-stability": "dev",
     "authors": [
         {
             "name": "Pavel Macovschi",
