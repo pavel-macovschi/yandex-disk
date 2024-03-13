@@ -2,6 +2,7 @@
 
 namespace ImpressiveWeb\YandexDisk;
 
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Utils;
 use ImpressiveWeb\YandexDisk\BadRequest;
 use GrahamCampbell\GuzzleFactory\GuzzleFactory;
@@ -16,6 +17,8 @@ use Psr\Http\Message\StreamInterface;
 class Client
 {
     private const API_ENDPOINT = 'https://cloud-api.yandex.net/v1/disk/';
+
+    private const API_AUTH_URL = 'https://oauth.yandex.ru/';
 
     private const CODE_STATUSES = [
         400, // Wrong data.
@@ -35,14 +38,27 @@ class Client
     protected GuzzleClient $client;
 
     private string $pathPrefix;
-
+    private string $clientId;
+    private string $clientSecret;
     private string $token;
 
     public function __construct(
-        string $token = '',
+        string|array $credentials = null,
         string $pathPrefix = '',
     ) {
-        $this->token = $token;
+        if (is_array($credentials)) {
+            if (!isset($credentials['client_id']) || !isset($credentials['client_secret'])) {
+                throw new \Exception('You need to set client_id and client_secret credentials');
+            }
+
+            $this->clientId = $credentials['client_id'];
+            $this->clientSecret = $credentials['client_secret'];
+        }
+
+        if (is_string($credentials)) {
+            $this->token = $credentials;
+        }
+
         $this->pathPrefix = $pathPrefix;
         $this->client = new GuzzleClient(['handler' => GuzzleFactory::handler()]);
     }
@@ -786,8 +802,8 @@ class Client
 
             $uri = self::API_ENDPOINT . $subdomain;
             $response = $this->client->request($method, $uri, $options);
-        } catch (ClientException $exception) {
-            throw $this->determineException($exception);
+        } catch (ClientException $e) {
+            throw $this->determineException($e);
         }
 
         return json_decode($response->getBody(), true) ?? [];
@@ -817,20 +833,92 @@ class Client
     /**
      * Set an access token.
      */
-    public function setAccessToken(string $accessToken): self
+    public function setAccessToken(string $token): self
     {
-        $this->token = $accessToken;
+        $this->token = $token;
 
         return $this;
     }
 
     /**
-     * @return string[]
+     * @see https://yandex.ru/dev/id/doc/ru/codes/code-url
+     *
+     * @param array $extraParams Extra query parameters.
+     * @return string
      */
+    public function getAuthUrl(array $extraParams = []): string
+    {
+        $params = [
+            'response_type' => 'code',
+            'client_id' => $this->clientId,
+        ];
+
+        $params = http_build_query(
+            array_merge($params, $extraParams)
+        );
+
+        return self::API_AUTH_URL . 'authorize?' . $params;
+    }
+
+    /**
+     * @see https://yandex.ru/dev/id/doc/ru/codes/code-url#token
+     *
+    * @param string $code
+    * @return array|string
+    * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function grantAuthCodeAndGetToken(string $code, string $deviceId = '', string $deviceName = '', string $codeVerifier = ''): array|string
+    {
+        $params = [
+            'auth' => [$this->clientId, $this->clientSecret],
+            'form_params' => [
+                'grant_type' => 'authorization_code',
+                'code' => $code,
+                'device_id' => $deviceId,
+                'device_name' => $deviceName,
+                'code_verifier' => $codeVerifier,
+            ]
+        ];
+
+        try {
+            $reply = $this->client->post(self::API_AUTH_URL . 'token', $params);
+        } catch (ClientException $e) {
+            return $e->getMessage();
+        }
+
+        return json_decode($reply->getBody()->getContents(), true) ?? [];
+    }
+
+    /**
+     * @see https://yandex.ru/dev/id/doc/ru/tokens/refresh-client
+     *
+     * @param string $refreshToken
+     * @return array|string
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function refreshToken(string $refreshToken): array|string
+    {
+        $params = [
+            'auth' => [$this->clientId, $this->clientSecret],
+            'form_params' => [
+                'grant_type' => 'refresh_token',
+                'refresh_token' => $refreshToken,
+            ]
+        ];
+
+        try {
+            $reply = $this->client->post(self::API_AUTH_URL . 'token', $params);
+        } catch (ClientException $e) {
+            return $e->getMessage();
+        }
+
+        return json_decode($reply->getBody()->getContents(), true) ?? [];
+    }
+
     protected function getHeaders(): array
     {
         return [
-            'Authorization' => "OAuth $this->token",
+            'Authorization' => "OAuth $this->token"
         ];
     }
 }
