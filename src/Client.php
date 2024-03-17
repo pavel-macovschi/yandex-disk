@@ -10,6 +10,7 @@ use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Psr7\PumpStream;
 use Psr\Http\Message\StreamInterface;
+use Exception;
 
 /**
  * @see https://yandex.com/dev/disk/poligon/
@@ -36,30 +37,34 @@ class Client
     ];
 
     protected GuzzleClient $client;
-
-    private string $pathPrefix;
     private string $clientId;
     private string $clientSecret;
     private string $token;
 
+    /**
+     * @param string|array|null $authCredentials
+     * @param string $pathPrefix
+     * @param int $itemsLimit
+     * @throws \Exception
+     */
     public function __construct(
-        string|array $credentials = null,
-        string $pathPrefix = '',
+        string|array $authCredentials = null,
+        private string $pathPrefix = '',
+        private int $itemsLimit = 20
     ) {
-        if (is_array($credentials)) {
-            if (!isset($credentials['client_id']) || !isset($credentials['client_secret'])) {
+        if (is_array($authCredentials)) {
+            if (!isset($authCredentials['client_id']) || !isset($authCredentials['client_secret'])) {
                 throw new \Exception('You need to set client_id and client_secret credentials');
             }
 
-            $this->clientId = $credentials['client_id'];
-            $this->clientSecret = $credentials['client_secret'];
+            $this->clientId = $authCredentials['client_id'];
+            $this->clientSecret = $authCredentials['client_secret'];
         }
 
-        if (is_string($credentials)) {
-            $this->token = $credentials;
+        if (is_string($authCredentials)) {
+            $this->token = $authCredentials;
         }
 
-        $this->pathPrefix = $pathPrefix;
         $this->client = new GuzzleClient(['handler' => GuzzleFactory::handler()]);
     }
 
@@ -110,10 +115,10 @@ class Client
     {
         $params = [
             'query' => [
-                'path' => $this->normalizePath($path),
+                'path'   => $this->normalizePath($path),
                 'fields' => implode(',', $fields),
             ],
-            'body' => json_encode(['custom_properties' => $metaProperties])
+            'body'  => json_encode(['custom_properties' => $metaProperties])
         ];
 
         return $this->makeRequest('PATCH', 'resources', $params);
@@ -147,13 +152,13 @@ class Client
         bool $deep = false
     ): array {
         $params = [
-            'path' => $this->normalizePath($path),
-            'fields' => implode(',', $fields),
-            'limit' => $limit,
-            'offset' => $offset,
+            'path'         => $this->normalizePath($path),
+            'fields'       => implode(',', $fields),
+            'limit'        => $this->getLimit($limit),
+            'offset'       => $offset,
             'preview_crop' => $previewCrop,
             'preview_size' => $previewSize,
-            'sort' => $sort
+            'sort'         => $sort
         ];
 
         // Recursive reading.
@@ -221,13 +226,13 @@ class Client
         string $sortField = 'name',
     ): array {
         $params = [
-            'fields' => implode(',', $fields),
-            'limit' => $limit,
-            'media_type' => implode(',', $mediaTypes),
+            'fields'       => implode(',', $fields),
+            'limit'        => $this->getLimit($limit),
+            'media_type'   => implode(',', $mediaTypes),
             'preview_size' => $previewSize,
             'preview_crop' => $previewCrop,
-            'sort' => $sortField,
-            'offset' => $offset,
+            'sort'         => $sortField,
+            'offset'       => $offset,
         ];
 
         return $this->makeRequest('GET', 'resources/files', $params);
@@ -254,11 +259,11 @@ class Client
         string $previewSize = 'S'
     ): array {
         $params = [
-            'media_type' => implode(',', $mediaTypes),
-            'fields' => implode(',', $fields),
+            'media_type'   => implode(',', $mediaTypes),
+            'fields'       => implode(',', $fields),
             'preview_size' => $previewSize,
             'preview_crop' => $previewCrop,
-            'limit' => $limit,
+            'limit'        => $this->getLimit($limit),
         ];
 
         return $this->makeRequest('GET', 'resources/last-uploaded', $params);
@@ -303,11 +308,11 @@ class Client
         bool $async = false
     ): array {
         $params = [
-            'path' => $this->normalizePath($path),
-            'md5' => $md5,
-            'fields' => implode(',', $fields),
+            'path'        => $this->normalizePath($path),
+            'md5'         => $md5,
+            'fields'      => implode(',', $fields),
             'permanently' => $permanently,
-            'async' => $async,
+            'async'       => $async,
         ];
 
         return $this->makeRequest('DELETE', 'resources', $params);
@@ -329,9 +334,9 @@ class Client
     public function move(string $from, string $to, bool $overwrite = false, bool $async = false): array
     {
         $params = [
-            'from' => $this->normalizePath($from),
-            'path' => $this->normalizePath($to),
-            'overwrite' => $overwrite,
+            'from'        => $this->normalizePath($from),
+            'path'        => $this->normalizePath($to),
+            'overwrite'   => $overwrite,
             'force_async' => $async,
         ];
 
@@ -354,9 +359,9 @@ class Client
     public function copy(string $from, string $to, bool $overwrite = false, bool $async = false): array
     {
         $params = [
-            'from' => $this->normalizePath($from),
-            'path' => $this->normalizePath($to),
-            'overwrite' => $overwrite,
+            'from'        => $this->normalizePath($from),
+            'path'        => $this->normalizePath($to),
+            'overwrite'   => $overwrite,
             'force_async' => $async,
         ];
 
@@ -376,7 +381,7 @@ class Client
     public function getDownloadUrl(string $path, array $fields = []): array
     {
         $params = [
-            'path' => $this->normalizePath($path),
+            'path'   => $this->normalizePath($path),
             'fields' => implode(',', $fields),
         ];
 
@@ -397,9 +402,9 @@ class Client
     public function getUploadUrl(string $path, bool $overwrite = false, array $fields = []): array
     {
         $params = [
-            'path' => $this->normalizePath($path),
+            'path'      => $this->normalizePath($path),
             'overwrite' => $overwrite,
-            'fields' => implode(',', $fields),
+            'fields'    => implode(',', $fields),
         ];
 
         return $this->makeRequest('GET', 'resources/upload', $params);
@@ -470,12 +475,12 @@ class Client
         string $type = ''
     ): array {
         $params = [
-            'fields' => implode(',', $fields),
-            'limit' => $limit,
-            'offset' => $offset,
+            'fields'       => implode(',', $fields),
+            'limit'        => $this->getLimit($limit),
+            'offset'       => $offset,
             'preview_crop' => $preview_crop,
             'preview_size' => $preview_size,
-            'type' => $type,
+            'type'         => $type,
         ];
 
         return $this->makeRequest('GET', 'resources/public', $params);
@@ -494,7 +499,7 @@ class Client
     public function resourcePublish(string $path, array $fields = []): array
     {
         $params = [
-            'path' => $this->normalizePath($path),
+            'path'   => $this->normalizePath($path),
             'fields' => implode(',', $fields),
         ];
 
@@ -511,7 +516,7 @@ class Client
     public function resourceUnpublish(string $path, array $fields = []): array
     {
         $params = [
-            'path' => $this->normalizePath($path),
+            'path'   => $this->normalizePath($path),
             'fields' => implode(',', $fields),
         ];
 
@@ -543,14 +548,14 @@ class Client
         string $sort = ''
     ): array {
         $params = [
-            'public_key' => $publicKeyOrUrl,
-            'path' => $path,
-            'fields' => implode(',', $fields),
-            'limit' => $limit,
-            'offset' => $offset,
+            'public_key'   => $publicKeyOrUrl,
+            'path'         => $path,
+            'fields'       => implode(',', $fields),
+            'limit'        => $this->getLimit($limit),
+            'offset'       => $offset,
             'preview_crop' => $preview_crop,
             'preview_size' => $preview_size,
-            'type' => $sort,
+            'type'         => $sort,
         ];
 
         return $this->makeRequest('GET', 'public/resources', $params);
@@ -572,8 +577,8 @@ class Client
     ): array {
         $params = [
             'public_key' => $publicKeyOrUrl,
-            'fields' => implode(',', $fields),
-            'path' => $path,
+            'fields'     => implode(',', $fields),
+            'path'       => $path,
         ];
 
         return $this->makeRequest('GET', 'public/resources/download', $params);
@@ -600,11 +605,11 @@ class Client
         bool $forceAsync = false
     ): array {
         $params = [
-            'public_key' => $publicKeyOrUrl,
-            'path' => $fromPath,
-            'save_path' => $this->normalizePath($savePath),
-            'name' => $name,
-            'fields' => implode(',', $fields),
+            'public_key'  => $publicKeyOrUrl,
+            'path'        => $fromPath,
+            'save_path'   => $this->normalizePath($savePath),
+            'name'        => $name,
+            'fields'      => implode(',', $fields),
             'force_async' => $forceAsync,
         ];
 
@@ -638,13 +643,13 @@ class Client
         string $sort = 'created'
     ): array {
         $params = [
-            'path' => $this->normalizePath($path),
-            'fields' => implode(',', $fields),
+            'path'         => $this->normalizePath($path),
+            'fields'       => implode(',', $fields),
             'preview_size' => $previewSize,
             'preview_crop' => $previewCrop,
-            'limit' => $limit,
-            'offset' => $offset,
-            'sort' => $sort,
+            'limit'        => $this->getLimit($limit),
+            'offset'       => $offset,
+            'sort'         => $sort,
         ];
 
         return $this->makeRequest('GET', 'trash/resources', $params);
@@ -672,11 +677,11 @@ class Client
         bool $overwrite = false
     ): array {
         $params = [
-            'path' => self::trimPath($path),
-            'fields' => implode(',', $fields),
+            'path'       => self::trimPath($path),
+            'fields'     => implode(',', $fields),
             'forceAsync' => $forceAsync,
-            'name' => $name,
-            'overwrite' => $overwrite,
+            'name'       => $name,
+            'overwrite'  => $overwrite,
         ];
 
         return $this->makeRequest('PUT', 'trash/resources/restore', $params);
@@ -696,8 +701,8 @@ class Client
     public function trashContentDelete(string $path, array $fields = [], bool $forceAsync = false): array
     {
         $params = [
-            'path' => self::trimPath($path),
-            'fields' => implode(',', $fields),
+            'path'       => self::trimPath($path),
+            'fields'     => implode(',', $fields),
             'forceAsync' => $forceAsync,
         ];
 
@@ -717,8 +722,8 @@ class Client
     public function trashClear(array $fields = [], bool $forceAsync = false): array
     {
         $params = [
-            'path' => '/',
-            'fields' => implode(',', $fields),
+            'path'        => '/',
+            'fields'      => implode(',', $fields),
             'force_async' => $forceAsync,
         ];
 
@@ -739,7 +744,7 @@ class Client
     {
         $params = [
             'operation_id' => $id,
-            'fields' => implode(',', $fields),
+            'fields'       => implode(',', $fields),
         ];
 
         return $this->makeRequest('GET', 'disk/operations', $params);
@@ -803,7 +808,7 @@ class Client
             $uri = self::API_ENDPOINT . $subdomain;
             $response = $this->client->request($method, $uri, $options);
         } catch (ClientException $e) {
-            throw $this->determineException($e);
+            throw $this->handleException($e);
         }
 
         return json_decode($response->getBody(), true) ?? [];
@@ -811,12 +816,15 @@ class Client
 
     /**
      * @param ClientException $exception
-     * @return \Exception
+     * @return Exception
      */
-    protected function determineException(ClientException $exception): \Exception
+    protected function handleException(ClientException $exception): Exception
     {
-        if (in_array($exception->getResponse()->getStatusCode(), self::CODE_STATUSES)) {
-            return new BadRequest($exception->getResponse());
+        $response = $exception->getResponse();
+        $statusCode = $response->getStatusCode();
+
+        if (in_array($statusCode, self::CODE_STATUSES)) {
+            return new BadRequest($response);
         }
 
         return $exception;
@@ -850,7 +858,7 @@ class Client
     {
         $params = [
             'response_type' => 'code',
-            'client_id' => $this->clientId,
+            'client_id'     => $this->clientId,
         ];
 
         $params = http_build_query(
@@ -863,19 +871,23 @@ class Client
     /**
      * @see https://yandex.ru/dev/id/doc/ru/codes/code-url#token
      *
-    * @param string $code
-    * @return array|string
-    * @throws \GuzzleHttp\Exception\GuzzleException
+     * @param string $code
+     * @return array|string
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function grantAuthCodeAndGetToken(string $code, string $deviceId = '', string $deviceName = '', string $codeVerifier = ''): array|string
-    {
+    public function grantAuthCodeAndGetToken(
+        string $code,
+        string $deviceId = '',
+        string $deviceName = '',
+        string $codeVerifier = ''
+    ): array|string {
         $params = [
-            'auth' => [$this->clientId, $this->clientSecret],
+            'auth'        => [$this->clientId, $this->clientSecret],
             'form_params' => [
-                'grant_type' => 'authorization_code',
-                'code' => $code,
-                'device_id' => $deviceId,
-                'device_name' => $deviceName,
+                'grant_type'    => 'authorization_code',
+                'code'          => $code,
+                'device_id'     => $deviceId,
+                'device_name'   => $deviceName,
                 'code_verifier' => $codeVerifier,
             ]
         ];
@@ -899,9 +911,9 @@ class Client
     public function refreshToken(string $refreshToken): array|string
     {
         $params = [
-            'auth' => [$this->clientId, $this->clientSecret],
+            'auth'        => [$this->clientId, $this->clientSecret],
             'form_params' => [
-                'grant_type' => 'refresh_token',
+                'grant_type'    => 'refresh_token',
                 'refresh_token' => $refreshToken,
             ]
         ];
@@ -920,5 +932,16 @@ class Client
         return [
             'Authorization' => "OAuth $this->token"
         ];
+    }
+
+    /**
+     * Determine max items limit if it's set in a client.
+     *
+     * @param $limit
+     * @return int
+     */
+    private function getLimit($limit): int
+    {
+        return $limit > $this->itemsLimit ? $limit : $this->itemsLimit;
     }
 }
