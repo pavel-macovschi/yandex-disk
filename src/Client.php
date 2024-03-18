@@ -851,18 +851,22 @@ class Client
     /**
      * @see https://yandex.ru/dev/id/doc/ru/codes/code-url
      *
-     * @param array $extraParams Extra query parameters.
+     * @param array $options Query parameters.
      * @return string
      */
-    public function getAuthUrl(array $extraParams = []): string
+    public function getAuthUrl(array $options = []): string
     {
+        if (!$this->clientId) {
+            throw new Exception('Client id should be set in a Client instantiation or in the options');
+        }
+
         $params = [
             'response_type' => 'code',
             'client_id'     => $this->clientId,
         ];
 
         $params = http_build_query(
-            array_merge($params, $extraParams)
+            array_merge($params, $options)
         );
 
         return self::API_AUTH_URL . 'authorize?' . $params;
