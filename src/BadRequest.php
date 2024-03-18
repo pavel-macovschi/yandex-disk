@@ -6,10 +6,12 @@ use Psr\Http\Message\ResponseInterface;
 
 class BadRequest extends \Exception
 {
-    public function __construct(public ResponseInterface $response)
+    public function __construct(public ResponseInterface $response, $lang)
     {
         $body = json_decode($response->getBody(), true);
 
-        parent::__construct($body['description']);
+        $error = $lang == 'ru' ? $body['message'] : $body['description'];
+
+        parent::__construct($error);
     }
 }
