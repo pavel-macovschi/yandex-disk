@@ -50,7 +50,8 @@ class Client
     public function __construct(
         string|array $authCredentials = null,
         private string $pathPrefix = '',
-        private int $itemsLimit = 20
+        private int $itemsLimit = 20, 
+        private string $errorLanguage = 'en'
     ) {
         if (is_array($authCredentials)) {
             if (!isset($authCredentials['client_id']) || !isset($authCredentials['client_secret'])) {
@@ -187,7 +188,7 @@ class Client
                         $path = $item['path'];
                     }
 
-                    $deepItems = $this->listContent($path, ...array_slice(func_get_args(), 1));
+                    $deepItems = $this->listContent($path, [], $params['limit'], $params['offset'], $params['preview_crop'], $params['preview_size'], $params['sort'], $deep);
 
                     foreach ($deepItems as $deepItem) {
                         $items[] = $deepItem;
@@ -824,7 +825,7 @@ class Client
         $statusCode = $response->getStatusCode();
 
         if (in_array($statusCode, self::CODE_STATUSES)) {
-            return new BadRequest($response);
+            return new BadRequest($response, $this->errorLanguage);
         }
 
         return $exception;
@@ -851,21 +852,24 @@ class Client
     /**
      * @see https://yandex.ru/dev/id/doc/ru/codes/code-url
      *
-     * @param array $extraParams Extra query parameters.
-     * @return string
+     * @param array $options extra query parameters
      */
-    public function getAuthUrl(array $extraParams = []): string
+    public function getAuthUrl(array $options = []): string
     {
         $params = [
             'response_type' => 'code',
-            'client_id'     => $this->clientId,
+            'client_id' => $this->clientId ?: $options['client_id'],
         ];
 
+        if (!isset($params['client_id'])) {
+            throw new \Exception('Cannot create auth url because client_id is not set');
+        }
+
         $params = http_build_query(
-            array_merge($params, $extraParams)
+            array_merge($params, $options)
         );
 
-        return self::API_AUTH_URL . 'authorize?' . $params;
+        return self::API_AUTH_URL.'authorize?'.$params;
     }
 
     /**
