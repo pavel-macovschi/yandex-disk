@@ -10,7 +10,7 @@ use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Psr7\PumpStream;
 use Psr\Http\Message\StreamInterface;
-use Exception;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * @see https://yandex.com/dev/disk/poligon/
@@ -50,8 +50,7 @@ class Client
     public function __construct(
         string|array $authCredentials = null,
         private string $pathPrefix = '',
-        private int $itemsLimit = 20, 
-        private string $errorLanguage = 'en'
+        private int $itemsLimit = 20
     ) {
         if (is_array($authCredentials)) {
             if (!isset($authCredentials['client_id']) || !isset($authCredentials['client_secret'])) {
@@ -811,21 +810,23 @@ class Client
         } catch (ClientException $e) {
             throw $this->handleException($e);
         }
-
-        return json_decode($response->getBody(), true) ?? [];
+//        return json_decode($reply->getBody(), true) ?? [];
+        return $this->decodeContents($response) ?? [];
     }
 
     /**
      * @param ClientException $exception
-     * @return Exception
+     * @return \Exception
      */
-    protected function handleException(ClientException $exception): Exception
+    protected function handleException(ClientException $exception): \Exception
     {
         $response = $exception->getResponse();
         $statusCode = $response->getStatusCode();
+        $body = $this->decodeContents($response);
+        $message = $body['description'];
 
         if (in_array($statusCode, self::CODE_STATUSES)) {
-            return new BadRequest($response, $this->errorLanguage);
+            return new BadRequest($message);
         }
 
         return $exception;
@@ -869,7 +870,7 @@ class Client
             array_merge($params, $options)
         );
 
-        return self::API_AUTH_URL.'authorize?'.$params;
+        return self::API_AUTH_URL . 'authorize?' . $params;
     }
 
     /**
@@ -897,12 +898,12 @@ class Client
         ];
 
         try {
-            $reply = $this->client->post(self::API_AUTH_URL . 'token', $params);
+            $response = $this->client->post(self::API_AUTH_URL . 'token', $params);
         } catch (ClientException $e) {
             return $e->getMessage();
         }
 
-        return json_decode($reply->getBody()->getContents(), true) ?? [];
+        return $this->decodeContents($response) ?? [];
     }
 
     /**
@@ -923,12 +924,12 @@ class Client
         ];
 
         try {
-            $reply = $this->client->post(self::API_AUTH_URL . 'token', $params);
+            $response = $this->client->post(self::API_AUTH_URL . 'token', $params);
         } catch (ClientException $e) {
             return $e->getMessage();
         }
 
-        return json_decode($reply->getBody()->getContents(), true) ?? [];
+        return $this->decodeContents($response) ?? [];
     }
 
     protected function getHeaders(): array
@@ -947,5 +948,14 @@ class Client
     private function getLimit($limit): int
     {
         return $limit > $this->itemsLimit ? $limit : $this->itemsLimit;
+    }
+
+    /**
+     * @param ResponseInterface $response
+     * @return mixed
+     */
+    private function decodeContents(ResponseInterface $response): mixed
+    {
+        return json_decode($response->getBody()->getContents(), true);
     }
 }

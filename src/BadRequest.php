@@ -2,16 +2,10 @@
 
 namespace ImpressiveWeb\YandexDisk;
 
-use Psr\Http\Message\ResponseInterface;
-
 class BadRequest extends \Exception
 {
-    public function __construct(public ResponseInterface $response, $lang)
+    public function __construct($message)
     {
-        $body = json_decode($response->getBody(), true);
-
-        $error = $lang == 'ru' ? $body['message'] : $body['description'];
-
-        parent::__construct($error);
+        parent::__construct($message);
     }
 }
