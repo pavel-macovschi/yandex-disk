@@ -18,9 +18,7 @@ use Psr\Http\Message\ResponseInterface;
 class Client
 {
     private const API_ENDPOINT = 'https://cloud-api.yandex.net/v1/disk/';
-
     private const API_AUTH_URL = 'https://oauth.yandex.ru/';
-
     private const CODE_STATUSES = [
         400, // Wrong data.
         401, // Not authorized.
@@ -35,11 +33,13 @@ class Client
         503, // Service temporary unavailable.
         507, // Disk space is not enough.
     ];
-
     protected GuzzleClient $client;
     private string $clientId;
     private string $clientSecret;
-    private string $token;
+    private ?string $accessToken = null;
+    private string $refreshToken;
+    private ?int $accessTokenAddedAt = null;
+    private ?int $accessTokenExpiresIn = null;
 
     /**
      * @param string|array|null $authCredentials
@@ -62,7 +62,7 @@ class Client
         }
 
         if (is_string($authCredentials)) {
-            $this->token = $authCredentials;
+            $this->accessToken = $authCredentials;
         }
 
         $this->client = new GuzzleClient(['handler' => GuzzleFactory::handler()]);
@@ -78,10 +78,27 @@ class Client
     {
         $this->pathPrefix = $pathPrefix;
     }
-
-    public function getPathPrefix(): string
+    public function setRefreshToken(string $refreshToken): void
     {
-        return $this->pathPrefix;
+        $this->refreshToken = $refreshToken;
+    }
+    public function setAccessTokenAddedAt(int $accessTokenAddedAt): void
+    {
+        $this->accessTokenAddedAt = $accessTokenAddedAt;
+    }
+    public function setAccessTokenExpiresIn(int $accessTokenExpiresIn): void
+    {
+        $this->accessTokenExpiresIn = $accessTokenExpiresIn;
+    }
+    public function getAccessToken(): string
+    {
+        return $this->accessToken;
+    }
+    public function setAccessToken(string $token): self
+    {
+        $this->accessToken = $token;
+
+        return $this;
     }
 
     /**
@@ -177,7 +194,7 @@ class Client
                     if ($this->pathPrefix) {
                         $path = trim(
                             str_replace(
-                                $this->getPathPrefix(),
+                                $this->pathPrefix,
                                 '',
                                 $item['path']
                             ),
@@ -786,6 +803,11 @@ class Client
      */
     private function makeRequest(string $method, string $subdomain = '', array $params = null): mixed
     {
+        // Check if an access token is expired.
+        if ($this->isExpired()) {
+            $this->refresh();
+        }
+
         try {
             if (isset($params['headers'])) {
                 $options = ['headers' => array_merge($this->getHeaders(), $params['headers'])];
@@ -833,24 +855,6 @@ class Client
     }
 
     /**
-     * Get an access token.
-     */
-    public function getAccessToken(): string
-    {
-        return $this->token;
-    }
-
-    /**
-     * Set an access token.
-     */
-    public function setAccessToken(string $token): self
-    {
-        $this->token = $token;
-
-        return $this;
-    }
-
-    /**
      * @see https://yandex.ru/dev/id/doc/ru/codes/code-url
      *
      * @param array $options extra query parameters
@@ -885,7 +889,7 @@ class Client
         string $deviceId = '',
         string $deviceName = '',
         string $codeVerifier = ''
-    ): array|string {
+    ): mixed {
         $params = [
             'auth'        => [$this->clientId, $this->clientSecret],
             'form_params' => [
@@ -899,43 +903,19 @@ class Client
 
         try {
             $response = $this->client->post(self::API_AUTH_URL . 'token', $params);
+            $this->handleGrantData($response);
         } catch (ClientException $e) {
-            return $e->getMessage();
+            echo $e->getMessage();
+            return false;
         }
 
-        return $this->decodeContents($response) ?? [];
-    }
-
-    /**
-     * @see https://yandex.ru/dev/id/doc/ru/tokens/refresh-client
-     *
-     * @param string $refreshToken
-     * @return array|string
-     * @throws \GuzzleHttp\Exception\GuzzleException
-     */
-    public function refreshToken(string $refreshToken): array|string
-    {
-        $params = [
-            'auth'        => [$this->clientId, $this->clientSecret],
-            'form_params' => [
-                'grant_type'    => 'refresh_token',
-                'refresh_token' => $refreshToken,
-            ]
-        ];
-
-        try {
-            $response = $this->client->post(self::API_AUTH_URL . 'token', $params);
-        } catch (ClientException $e) {
-            return $e->getMessage();
-        }
-
-        return $this->decodeContents($response) ?? [];
+        return true;
     }
 
     protected function getHeaders(): array
     {
         return [
-            'Authorization' => "OAuth $this->token"
+            'Authorization' => "OAuth $this->accessToken"
         ];
     }
 
@@ -957,5 +937,46 @@ class Client
     private function decodeContents(ResponseInterface $response): mixed
     {
         return json_decode($response->getBody()->getContents(), true);
+    }
+
+    /**
+     * @see https://yandex.ru/dev/id/doc/ru/tokens/refresh-client
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    protected function refresh(): void
+    {
+        if (empty($this->refreshToken)) {
+            throw new \Exception('Refresh token is not set');
+        }
+
+        $params = [
+            'auth'        => [$this->clientId, $this->clientSecret],
+            'form_params' => [
+                'grant_type'    => 'refresh_token',
+                'refresh_token' => $this->refreshToken,
+            ]
+        ];
+
+        try {
+            $response = $this->client->post(self::API_AUTH_URL . 'token', $params);
+            $data = $this->decodeContents($response);
+            $this->setAccessToken($data['access_token']);
+            $this->setRefreshToken($data['refresh_token']);
+            $this->setAccessTokenExpiresIn($data['expires_in']);
+            $this->setAccessTokenAddedAt(time());
+        } catch (ClientException $e) {
+            echo $e->getMessage();
+        }
+    }
+
+    /**
+     * @return bool
+     */
+    protected function isExpired(): bool
+    {
+        $expiresIn = $this->accessTokenAddedAt + $this->accessTokenExpiresIn;
+
+        return time() > $expiresIn ? true : false;
     }
 }
