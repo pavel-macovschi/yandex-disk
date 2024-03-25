@@ -18,7 +18,9 @@ use Psr\Http\Message\ResponseInterface;
 class Client
 {
     private const API_ENDPOINT = 'https://cloud-api.yandex.net/v1/disk/';
+
     private const API_AUTH_URL = 'https://oauth.yandex.ru/';
+
     private const CODE_STATUSES = [
         400, // Wrong data.
         401, // Not authorized.
@@ -33,12 +35,19 @@ class Client
         503, // Service temporary unavailable.
         507, // Disk space is not enough.
     ];
+
     protected GuzzleClient $client;
+
     private string $clientId;
+
     private string $clientSecret;
+
     private ?string $accessToken = null;
+
     private string $refreshToken;
+
     private ?int $accessTokenAddedAt = null;
+
     private ?int $accessTokenExpiresIn = null;
 
     /**
@@ -78,22 +87,32 @@ class Client
     {
         $this->pathPrefix = $pathPrefix;
     }
+
+    public function getPathPrefix(): string
+    {
+        return $this->pathPrefix;
+    }
+
     public function setRefreshToken(string $refreshToken): void
     {
         $this->refreshToken = $refreshToken;
     }
+
     public function setAccessTokenAddedAt(int $accessTokenAddedAt): void
     {
         $this->accessTokenAddedAt = $accessTokenAddedAt;
     }
+
     public function setAccessTokenExpiresIn(int $accessTokenExpiresIn): void
     {
         $this->accessTokenExpiresIn = $accessTokenExpiresIn;
     }
+
     public function getAccessToken(): string
     {
         return $this->accessToken;
     }
+
     public function setAccessToken(string $token): self
     {
         $this->accessToken = $token;
@@ -863,7 +882,7 @@ class Client
     {
         $params = [
             'response_type' => 'code',
-            'client_id' => $this->clientId ?: $options['client_id'],
+            'client_id'     => $this->clientId ?: $options['client_id'],
         ];
 
         if (!isset($params['client_id'])) {
