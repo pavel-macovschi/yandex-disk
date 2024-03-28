@@ -63,7 +63,7 @@ class Client
     ) {
         if (is_array($authCredentials)) {
             if (empty($authCredentials['client_id']) || empty($authCredentials['client_secret'])) {
-                throw new \Exception('You need to set client_id and client_secret credentials');
+                throw new \Exception('You need to set client_id and client_secret');
             }
 
             $this->clientId = $authCredentials['client_id'];
@@ -809,16 +809,17 @@ class Client
     }
 
     /**
-     * Helper to make requests.
-     *
+     * @param string $method
+     * @param string $subdomain
+     * @param array $params
+     * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
-     * @throws \Exception
      */
-    private function makeRequest(string $method, string $subdomain = '', array $params = null): mixed
+    private function makeRequest(string $method, string $subdomain = '', array $params = []): mixed
     {
         // Check if an access token is expired.
-        if ($this->isExpired()) {
-            $this->refresh();
+        if (isset($this->refreshToken) && $this->isExpired()) {
+            $this->refreshAccessToken();
         }
 
         try {
@@ -882,18 +883,20 @@ class Client
         $params = http_build_query(
             array_merge($params, $options)
         );
-dd($params);
+
         return self::API_AUTH_URL . 'authorize?' . $params;
     }
 
     /**
      * @see https://yandex.ru/dev/id/doc/ru/codes/code-url#token
      *
+     * Returns access and refresh tokens.
+     *
      * @param string $code
      * @return array|string
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function grantAuthCodeAndGetToken(
+    public function authCodeAndGetToken(
         string $code,
         string $deviceId = '',
         string $deviceName = '',
@@ -953,12 +956,8 @@ dd($params);
      *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    protected function refresh(): void
+    protected function refreshAccessToken(): void
     {
-        if (empty($this->refreshToken)) {
-            throw new \Exception('Refresh token is not set');
-        }
-
         $params = [
             'auth'        => [$this->clientId, $this->clientSecret],
             'form_params' => [
