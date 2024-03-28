@@ -440,6 +440,16 @@ class Client
         return $this->makeRequest('GET', 'resources/upload', $params);
     }
 
+    /**
+     * @param string $path
+     * @param string $mode
+     * @return mixed
+     */
+    public function getStream(string $path, string $mode = 'r'): mixed
+    {
+        return Utils::tryFopen($path, $mode);
+    }
+
 //    /**
 //     * @see https://yandex.ru/dev/disk/api/reference/upload.html#response-upload
 //     *
