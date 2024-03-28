@@ -62,7 +62,7 @@ class Client
         private int $itemsLimit = 20
     ) {
         if (is_array($authCredentials)) {
-            if (!isset($authCredentials['client_id']) || !isset($authCredentials['client_secret'])) {
+            if (empty($authCredentials['client_id']) || empty($authCredentials['client_secret'])) {
                 throw new \Exception('You need to set client_id and client_secret credentials');
             }
 
@@ -77,12 +77,6 @@ class Client
         $this->client = new GuzzleClient(['handler' => GuzzleFactory::handler()]);
     }
 
-    /**
-     * Setter a base path prefix for using a relative path
-     *
-     * @param string $pathPrefix
-     * @return void
-     */
     public function setPathPrefix(string $pathPrefix): void
     {
         $this->pathPrefix = $pathPrefix;
@@ -882,17 +876,13 @@ class Client
     {
         $params = [
             'response_type' => 'code',
-            'client_id'     => $this->clientId ?: $options['client_id'],
+            'client_id'     => $this->clientId,
         ];
-
-        if (!isset($params['client_id'])) {
-            throw new \Exception('Cannot create auth url because client_id is not set');
-        }
 
         $params = http_build_query(
             array_merge($params, $options)
         );
-
+dd($params);
         return self::API_AUTH_URL . 'authorize?' . $params;
     }
 
