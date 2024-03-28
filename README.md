@@ -56,6 +56,3 @@ $client->setRefreshToken($refreshToken);
 ```
 
 ### Methods of API are relatively matching to methods of an original API. So you can read an offical documentation how to use it.
-
-
-
