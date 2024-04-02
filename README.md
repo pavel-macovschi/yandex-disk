@@ -2,7 +2,7 @@
 
 ## Installation
 
-You can install the package via composer:
+Package installation via composer:
 
 ``` bash
 composer require impressiveweb/yandex-disk
@@ -16,13 +16,17 @@ composer require impressiveweb/yandex-disk
 use ImpressiveWeb\YandexDisk\Client;
 // Access token.
 $accessToken = 'xxxxxxxxxxxxxxxxxxx';
+
 // Path to a whole disk.
 $pathPrefix = 'disk:/';
+
 // Client init with an access token.
 $client = new Client($accessToken, $pathPrefix);
 ```
 
-### Go to https://oauth.yandex.ru/client/new and create your first App and add necessary permissions. After getting client_id and client_secret you can use it in a client initialization.
+### Go to https://oauth.yandex.ru/client/new create your first App and add necessary permissions.
+
+### After getting client_id and client_secret you can use it in a client initialization.
 
 ```php
 // Auth credentials.
@@ -30,10 +34,16 @@ $credentials = [
     'client_id' => 'xxxxxxxxxxxxxxxxxxx',
     'client_secret' => 'xxxxxxxxxxxxxxxxxxx',
 ];
-// If you create you first APP, use that path.
-$pathPrefix = 'disk:/Applications/APP'
+
+// If you create you first APP, use your Application path.
+$pathPrefix = 'disk:/Applications/YourApp'
+
+// If you need to use the whole disk.
+$pathPrefix = 'disk:/'
+
 // Client init with credentials.
 $client = new Client($credentials, $pathPrefix);
+
 // Create and proceed an auth url to get a code.
 $authUrl = $client->getAuthUrl([
     'redirect_uri' => 'https://your-app'
@@ -43,18 +53,20 @@ $authUrl = $client->getAuthUrl([
 // https://your-app?code=xxxxxx
 
 // Code that is taken from a query.
-$code = 'xxxxxx';
+$code = 'xxxxxx'
+
 // Make a request to get an access and a refresh token. 
 $data = $client->authCodeAndGetToken($code);
+
 // If it is successful you'll get both tokens.
 $accessToken = $data['access_token'];
+
 // Save a refresh token somewhere securely to use it in farther requests.
 $refreshToken = $data['refresh_token'];
+
 // Refresh token should be set to make sure an automatic update of access token.
 $client->setRefreshToken($refreshToken); 
 ```
-
-### Methods of API are relatively matching to methods of an original API. So you can read an offical documentation how to use it.
 
 ## Here are several examples of API usage.
 
@@ -79,7 +91,7 @@ array:11 [▼
   "revision" => 1711829122396623
 ]
 
-// Get a disk meta information using preferable fields of attributes.
+// Get a disk meta information with selected fields.
 $reply = $client->discInfo(['max_file_size', 'paid_max_file_size', 'total_space']);
 
 // Reply data.
@@ -110,14 +122,16 @@ array:10 [▼
 ]
 ```
 
-### Get a list of contents for a root directory using preferable fields of attributes.
-
-#### There is a default limit for 20 items on catalogue reading.
-
-#### You can increase which amount of items will be returned on a method level or on a Client initialization step.
-
 ```php
-// Since php 8.0 you can use named arguments.
+
+// There is a default limit for 20 items per one request when you read catalogue.
+
+// You can increase a default amount of items on a Client initialization step.
+$client = new Client(itemsLimit: 100);
+
+// Since php 8.0 you can use named arguments and skip a lot of default arguments.
+
+// Get a list of contents for a root directory using selected fields.
 $reply = $client->listContent(fields: ['_embedded.items.path']);
 
 // Reply data.
@@ -135,44 +149,83 @@ array:1 [▼
     ]
   ]
 ]
+
+// Get a list of contents by a path with 200 items limit.
+$limit = 200;
+$path = 'path/to/resource';
+
+// Returns 100 items using a specified path.
+$client->listContent($path, limit: $limit);
+
+// Returns 100 items that are sorted by size using a specified path.
+$client->listContent($path, limit: $limit, sort: 'size');
+
+// Returns items using a specified path recursively.
+// Amount of all items in this case depends on subdirectories you have in a path.  
+$client->listContent($path, limit: $limit, deep: true);
 ```
 
-### Get a list of contents for a preferable path with extra fields.
-
-```php
-$path = 'custom/disk/path';
-$fields = ['_embedded.items'];
-// Default limit is set to 20 items.
-$limit = 100;
-// Returns 100 items using custom path and returned fields.
-$client->listContent($path, $fields, $limit);
-
-// Returns 100 items using custom path and returned fields that are sorted by size.
-$client->listContent($path, $fields, $limit, sort: 'size');
-
-// Returns items using custom path and returned fields recursively.
-$client->listContent($path, $fields, deep: true);
-```
 
 ### Work with directories.
 
 ```php
-// Add a new directory.
 $path = 'path/to/created/dir';
+$from = 'from/path';
+$to = 'to/path';
+
+// Add a new directory.
 $client->addDirectory($path);
 
 // Copy directory.
-$from = 'path/to/created/dir';
-$to = 'path/to/another';
 $client->copy($from, $to);
 
 // Move directory.
-$from = 'path/from';
-$to = 'path/to';
 $client->move($from, $to);
 
 // Remove an existing directory.
 $client->remove($path);
 ```
 
-### Other methods are self descriptive and easy to understand.
+### Download | Upload resources.
+
+```php
+// Get download url.
+$reply = $client->getDownloadUrl('path/to/resource');
+
+// Reply data.
+array:3 [▼
+  "href" => "https://downloader.disk.yandex.ru/disk/8caa900296bd8b8daa64b36c870d9[...]"
+  "method" => "GET"
+  "templated" => false
+]
+
+// Depends on an application requirements you can get a link and download a resource directly via GET method. 
+$link = $reply['href'];
+
+// Or open a stream and use it for your own needs.
+$resource = $client->getStream($link);
+```
+
+### Work with a Trash.
+
+```php
+// Returns all resources in a trash.
+$client->trashListContent();
+
+// Returns resources in a specified deleted resource.
+$client->trashListContent('path/to/deleted/resource');
+
+// Restore a resource from a trash.
+$client->trashContentRestore('path/to/restored/dir');
+
+// Remove a specified resource in a trash. 
+$client->trashContentDelete('path/to/trash/resource/to-be/deleted');
+
+// Clear a trash completely.
+$client->trashClear();
+
+```
+
+### Some other methods are self-descriptive and easy to understand because most of them are similar to original API.
+
+### Read an official API documentation to get details how to use methods and arguments.

@@ -450,47 +450,40 @@ class Client
         return Utils::tryFopen($path, $mode);
     }
 
-//    /**
-//     * @see https://yandex.ru/dev/disk/api/reference/upload.html#response-upload
-//     *
-//     * @param resource $contents
-//     *
-//     * @throws \GuzzleHttp\Exception\GuzzleException
-//     */
-//    public function upload(string $to, $contents, bool $overwrite = false)
-//    {
-//        $path = $this->normalizePath($to);
-//        $data = $this->getUploadUrl($path, $overwrite);
-//
-//        if (!isset($data['href'])) {
-//            return false;
-//        }
-//
-//        $url = $data['href'];
-//
-//
-////        Utils::streamFor($resource);
-//
-//        $params = array_merge(
-//            [
-//                'query' => [
-//                    'path' => $path,
-//                    'url' => $url,
-//                ],
-//            ],
-//            [
-//                'body' => $contents,
-//            ]
-//        );
-//
-//        $result = $this->client->put($url, $params);
-//
-//        if (is_resource($contents)) {
-//            fclose($contents);
-//        }
-//
-//        return $result;
-//    }
+    /**
+     * @see https://yandex.ru/dev/disk/api/reference/upload.html#response-upload
+     *
+     * @param resource $contents
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function upload(string $toPath, $contents, bool $overwrite = false)
+    {
+        $data = $this->getUploadUrl($toPath, $overwrite);
+        $url = $data['href'];
+//        Utils::streamFor($resource);
+
+        $params = array_merge(
+            [
+                'query' => [
+                    'path' => $toPath,
+                    'url' => $url,
+                ],
+            ],
+            [
+                'body' => $contents,
+            ]
+        );
+//dd($params);
+        $result = $this->client->put($url, $params);
+
+        if (is_resource($contents)) {
+            fclose($contents);
+            unset($contents);
+        }
+
+        return $result;
+    }
 
     /**
      * Get a list of published resources.
@@ -697,7 +690,7 @@ class Client
 
 
     /**
-     * Restore a specified resource form a trash.
+     * Restore a specified resource from a trash.
      *
      * @see https://yandex.ru/dev/disk-api/doc/ru/reference/trash-restore
      *
@@ -942,7 +935,7 @@ class Client
     }
 
     /**
-     * Determine max items limit if it's set in a client.
+     * Determine maximum limit of items if it's set in a client.
      *
      * @param $limit
      * @return int
