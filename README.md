@@ -56,15 +56,23 @@ $authUrl = $client->getAuthUrl([
 $code = 'xxxxxx'
 
 // Make a request to get an access and a refresh token. 
-$data = $client->authCodeAndGetToken($code);
+$reply = $client->authCodeAndGetToken($code);
+
+// Reply data.
+array:4 [▼
+  "access_token" => "xx_xxxXXxxxAAAABWGbHaAAqjUwAAAADvXc-xxxxxxxxxxxxxxxxxxxx"
+  "expires_in" => 25137530
+  "refresh_token" => "1:xxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxx-xxxxxxxxxxxx"
+  "token_type" => "bearer"
+]
 
 // If it is successful you'll get both tokens.
-$accessToken = $data['access_token'];
+$accessToken = $reply['access_token'];
 
 // Save a refresh token somewhere securely to use it in farther requests.
-$refreshToken = $data['refresh_token'];
+$refreshToken = $reply['refresh_token'];
 
-// Refresh token should be set to make sure an automatic update of access token.
+// Refresh token should be set to make sure an access token update.
 $client->setRefreshToken($refreshToken); 
 ```
 
@@ -91,7 +99,7 @@ array:11 [▼
   "revision" => 1711829122396623
 ]
 
-// Get a disk meta information with selected fields.
+// Get a disk meta information with a list of attributes to be returned.
 $reply = $client->discInfo(['max_file_size', 'paid_max_file_size', 'total_space']);
 
 // Reply data.
@@ -102,9 +110,10 @@ array:3 [▼
 ]
 ```
 
-### Get a list of contents for a root directory.
+### Get all contents with metadata information.
 
 ```php
+// If a path is not set a path prefix will be used as a root directory.
 $reply = $client->listContent();
 
 // Reply data.
@@ -120,18 +129,14 @@ array:10 [▼
   "type" => "dir"
   "revision" => 1624962040946659
 ]
-```
 
-```php
-
-// There is a default limit for 20 items per one request when you read catalogue.
-
+// There is a default limit for 20 items per one request when you read catalogues.
 // You can increase a default amount of items on a Client initialization step.
 $client = new Client(itemsLimit: 100);
 
 // Since php 8.0 you can use named arguments and skip a lot of default arguments.
 
-// Get a list of contents for a root directory using selected fields.
+// Get a list of items for a root directory using selected fields.
 $reply = $client->listContent(fields: ['_embedded.items.path']);
 
 // Reply data.
@@ -150,7 +155,7 @@ array:1 [▼
   ]
 ]
 
-// Get a list of contents by a path with 200 items limit.
+// Get a list of items by a path with 200 items limit.
 $limit = 200;
 $path = 'path/to/resource';
 
@@ -165,7 +170,6 @@ $client->listContent($path, limit: $limit, sort: 'size');
 $client->listContent($path, limit: $limit, deep: true);
 ```
 
-
 ### Work with directories.
 
 ```php
@@ -173,55 +177,84 @@ $path = 'path/to/created/dir';
 $from = 'from/path';
 $to = 'to/path';
 
-// Add a new directory.
+// Add a new folder.
 $client->addDirectory($path);
 
-// Copy directory.
+// Copy a file or a folder.
 $client->copy($from, $to);
 
-// Move directory.
+// Move a file or a folder to a different location.
 $client->move($from, $to);
 
-// Remove an existing directory.
+// Delete a folder or a file at a given path.
 $client->remove($path);
 ```
 
-### Download | Upload resources.
+### Download resources.
 
 ```php
-// Get download url.
-$reply = $client->getDownloadUrl('path/to/resource');
+// 1. Get a download url.
+$path = 'path/to/existing/resource/on/disk';
+$reply = $client->getDownloadUrl($path, ['href']);
 
 // Reply data.
-array:3 [▼
+array:1 [▼
   "href" => "https://downloader.disk.yandex.ru/disk/8caa900296bd8b8daa64b36c870d9[...]"
-  "method" => "GET"
-  "templated" => false
 ]
 
-// Depends on an application requirements you can get a link and download a resource directly via GET method. 
+// 2. Depends on an application requirements you can get a link and download a resource directly via GET method. 
 $link = $reply['href'];
 
-// Or open a stream and use it for your own needs.
-$resource = $client->getStream($link);
+// 2. Or open a stream and use it for your own needs.
+$stream = $client->getStream($link);
+```
+
+### Upload resources.
+
+```php
+// 1. Get an upload url.
+$path = 'path/to/where/resource/will/be/placed/on/disk';
+$reply = $client->getUploadUrl($path);
+
+// Reply data.
+array:4 [▼
+  "operation_id" => "d97f66b1638b1438825ed6d5a5433eb15f95bd5298[...]"
+  "href" => "https://uploader54j.disk.yandex.net:443/upload-target/20240403T140247[...]"
+  "method" => "PUT"
+  "templated" => false
+]
+// If href in reply data will not be requested for 30 minutes it won't be available for uploading and you need to create another one.
+
+// 2. Use href however you want. 
+
+// 3. Or use an upload method to upload file using getStream helper.
+$name = 'picture.jpg';
+$fromPath = __DIR__.DIRECTORY_SEPARATOR.$name;
+$toPath = "path/on/disk/$name";
+// Open a stream.
+$stream = $client->getStream($fromPath, 'r+');
+// Upload file.
+$client->upload($toPath, $stream);
 ```
 
 ### Work with a Trash.
 
 ```php
-// Returns all resources in a trash.
+$path = 'path/to/trash/resource';
+
+// Listing a trash content.
 $client->trashListContent();
 
-// Returns resources in a specified deleted resource.
-$client->trashListContent('path/to/deleted/resource');
+// Listing a trash content in a specified path.
+$client->trashListContent($path);
 
-// Restore a resource from a trash.
-$client->trashContentRestore('path/to/restored/dir');
+// Restore a specified resource from a trash.
+$client->trashContentRestore($path);
 
-// Remove a specified resource in a trash. 
-$client->trashContentDelete('path/to/trash/resource/to-be/deleted');
+// Remove a resource from a basket. 
+$client->trashContentDelete($path);
 
-// Clear a trash completely.
+// Clear the whole trash.
 $client->trashClear();
 
 ```

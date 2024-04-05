@@ -29,14 +29,15 @@ class Client
         405, // Method not allowed.
         406, // Resource cannot be presented in a requested format.
         409, // Path "{path}" does not exist.
+        412, // Precondition failed.
         413, // File upload is not available. File is too large.
         423, // Under construction. Now you can only view and download files.
         429, // Too much requests.
-        503, // Service temporary unavailable.
+        503, // Service unavailable.
         507, // Disk space is not enough.
     ];
 
-    protected GuzzleClient $client;
+    private GuzzleClient $client;
 
     private string $clientId;
 
@@ -119,7 +120,7 @@ class Client
      *
      * @see https://yandex.ru/dev/disk-api/doc/ru/reference/capacity
      *
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
@@ -137,7 +138,7 @@ class Client
      *
      * @param string $path
      * @param array $metaProperties
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
@@ -161,7 +162,7 @@ class Client
      * @see https://yandex.ru/dev/disk-api/doc/ru/reference/meta
      *
      * @param string $path
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param int $limit
      * @param int $offset
      * @param bool $previewCrop
@@ -236,7 +237,7 @@ class Client
      *
      * @see https://yandex.ru/dev/disk/api/reference/all-files.html
      *
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param int $limit
      * @param array $mediaTypes 'audio','backup','book','compressed','data','development','diskimage','document','encoded','executable','flash','font','image','settings','spreadsheet','text','unknown','video','web'
      * @param int $offset
@@ -273,7 +274,7 @@ class Client
      *
      * @see https://yandex.ru/dev/disk/api/reference/recent-upload.html
      *
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param int $limit
      * @param array $mediaTypes 'audio','backup','book','compressed','data','development','diskimage','document','encoded','executable','flash','font','image','settings','spreadsheet','text','unknown','video','web'
      * @param bool $previewCrop
@@ -324,7 +325,7 @@ class Client
      *
      * @param string $path
      * @param string $md5
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param bool $permanently
      * @param bool $async
      * @return array
@@ -404,7 +405,7 @@ class Client
      * @see https://yandex.ru/dev/disk-api/doc/ru/reference/content
      *
      * @param string $path
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
@@ -423,9 +424,9 @@ class Client
      *
      * @see https://yandex.ru/dev/disk-api/doc/ru/reference/upload#url-request
      *
-     * @param string $path
+     * @param string $path Path on a disk where a file will be uploaded.
      * @param bool $overwrite
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
@@ -451,22 +452,26 @@ class Client
     }
 
     /**
+     * Upload a file or a folder.
+     *
+     *
      * @see https://yandex.ru/dev/disk/api/reference/upload.html#response-upload
      *
-     * @param resource $contents
-     *
+     * @param string $toPath Path on a disk where file will be uploaded.
+     * @param $contents
+     * @param bool $overwrite
+     * @return ResponseInterface
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function upload(string $toPath, $contents, bool $overwrite = false)
     {
-        $data = $this->getUploadUrl($toPath, $overwrite);
+        $data = $this->getUploadUrl($toPath, $overwrite, ['href']);
         $url = $data['href'];
-//        Utils::streamFor($resource);
 
         $params = array_merge(
             [
                 'query' => [
-                    'path' => $toPath,
+                    'path' => self::trimPath($toPath),
                     'url' => $url,
                 ],
             ],
@@ -474,13 +479,15 @@ class Client
                 'body' => $contents,
             ]
         );
-//dd($params);
+
+        // There is no need to pass access token on upload process.
         $result = $this->client->put($url, $params);
 
         if (is_resource($contents)) {
             fclose($contents);
             unset($contents);
         }
+
 
         return $result;
     }
@@ -490,7 +497,7 @@ class Client
      *
      * @see https://yandex.ru/dev/disk/api/reference/recent-public.html
      *
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param int $limit
      * @param int $offset
      * @param bool $preview_crop
@@ -525,7 +532,7 @@ class Client
      * @see https://yandex.ru/dev/disk/api/reference/publish.html#publish
      *
      * @param string $path
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
@@ -561,7 +568,7 @@ class Client
      *
      * @param string $publicKeyOrUrl
      * @param string $path
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param int $limit
      * @param int $offset
      * @param bool $preview_crop
@@ -598,7 +605,7 @@ class Client
      * Get a published resource download url.
      *
      * @param string $publicKeyOrUrl
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param string $path
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
@@ -624,7 +631,7 @@ class Client
      * @param string $fromPath
      * @param string $name
      * @param string $savePath
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param bool $forceAsync
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
@@ -649,7 +656,6 @@ class Client
         return $this->makeRequest('POST', 'public/resources/save-to-disk', $params);
     }
 
-
     /**
      * Listing a trash content.
      *
@@ -657,7 +663,7 @@ class Client
      *
      *
      * @param string $path
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param int $limit
      * @param int $offset
      * @param bool $previewCrop
@@ -688,14 +694,13 @@ class Client
         return $this->makeRequest('GET', 'trash/resources', $params);
     }
 
-
     /**
      * Restore a specified resource from a trash.
      *
      * @see https://yandex.ru/dev/disk-api/doc/ru/reference/trash-restore
      *
      * @param string $path
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param bool $forceAsync
      * @param string $name A new name of recovered resource
      * @param bool $overwrite
@@ -721,12 +726,12 @@ class Client
     }
 
     /**
-     * Remove a resource from a basket.
+     * Remove a resource from a trash.
      *
      * @see https://yandex.ru/dev/disk-api/doc/ru/reference/trash-delete
      *
      * @param string $path
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param bool $forceAsync
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
@@ -747,7 +752,7 @@ class Client
      *
      * @see https://yandex.ru/dev/disk-api/doc/ru/reference/trash-delete
      *
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @param bool $forceAsync
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
@@ -769,7 +774,7 @@ class Client
      * @see https://yandex.ru/dev/disk-api/doc/ru/reference/operations
      *
      * @param int $id
-     * @param array $fields
+     * @param array $fields Attributes list to be returned.
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
@@ -803,6 +808,8 @@ class Client
     }
 
     /**
+     * Trim path helper.
+     *
      * @param string $path
      * @return string
      */
@@ -843,13 +850,12 @@ class Client
             if (!empty($subdomain)) {
                 $subdomain .= '/';
             }
-
             $uri = self::API_ENDPOINT . $subdomain;
             $response = $this->client->request($method, $uri, $options);
         } catch (ClientException $e) {
             throw $this->handleException($e);
         }
-//        return json_decode($reply->getBody(), true) ?? [];
+
         return $this->decodeContents($response) ?? [];
     }
 
@@ -857,7 +863,7 @@ class Client
      * @param ClientException $exception
      * @return \Exception
      */
-    protected function handleException(ClientException $exception): \Exception
+    private function handleException(ClientException $exception): \Exception
     {
         $response = $exception->getResponse();
         $statusCode = $response->getStatusCode();
@@ -865,7 +871,7 @@ class Client
         $message = $body['description'];
 
         if (in_array($statusCode, self::CODE_STATUSES)) {
-            return new BadRequest($message);
+            return new \Exception($message);
         }
 
         return $exception;
@@ -896,7 +902,10 @@ class Client
      * Returns access and refresh tokens.
      *
      * @param string $code
-     * @return array|string
+     * @param string $deviceId
+     * @param string $deviceName
+     * @param string $codeVerifier
+     * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function authCodeAndGetToken(
@@ -918,16 +927,13 @@ class Client
 
         try {
             $response = $this->client->post(self::API_AUTH_URL . 'token', $params);
-            $this->handleGrantData($response);
+            return $this->decodeContents($response);
         } catch (ClientException $e) {
             echo $e->getMessage();
-            return false;
         }
-
-        return true;
     }
 
-    protected function getHeaders(): array
+    private function getHeaders(): array
     {
         return [
             'Authorization' => "OAuth $this->accessToken"
@@ -959,7 +965,7 @@ class Client
      *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    protected function refreshAccessToken(): void
+    private function refreshAccessToken(): void
     {
         $params = [
             'auth'        => [$this->clientId, $this->clientSecret],
@@ -984,7 +990,7 @@ class Client
     /**
      * @return bool
      */
-    protected function isExpired(): bool
+    private function isExpired(): bool
     {
         $expiresIn = $this->accessTokenAddedAt + $this->accessTokenExpiresIn;
 
