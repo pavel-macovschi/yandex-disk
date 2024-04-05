@@ -26,7 +26,7 @@ $client = new Client($accessToken, $pathPrefix);
 
 ### Go to https://oauth.yandex.ru/client/new create your first App and add necessary permissions.
 
-### After getting client_id and client_secret you can use it in a client initialization.
+### After getting client_id and client_secret you can use it for a client initialization.
 
 ```php
 // Auth credentials.
@@ -261,4 +261,4 @@ $client->trashClear();
 
 ### Some other methods are self-descriptive and easy to understand because most of them are similar to original API.
 
-### Read an official API documentation to get details how to use methods and arguments.
+### Read an official API documentation https://yandex.ru/dev/disk-api/doc/ru/ to get more details how to use methods and its arguments.
