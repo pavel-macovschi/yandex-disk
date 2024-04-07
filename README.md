@@ -259,6 +259,6 @@ $client->trashClear();
 
 ```
 
-### Some other methods are self-descriptive and easy to understand because most of them are similar to original API.
+### Some other methods are self-descriptive and easy to understand because the most of them are similar to original API.
 
 ### Read an official API documentation https://yandex.ru/dev/disk-api/doc/ru/ to get more details how to use methods and its arguments.

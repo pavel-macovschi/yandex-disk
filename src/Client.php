@@ -194,16 +194,9 @@ class Client
 
         // Recursive reading.
         if ($deep) {
-            // Unset returned fields for a correct catalog reading.
-            unset($params['fields']);
+            $items = $this->makeRequest('GET', 'resources', $params);
 
-            $items = $this->makeRequest('GET', 'resources', $params)['_embedded']['items'];
-
-            if (!count($items)) {
-                return [];
-            }
-
-            foreach ($items as $item) {
+            foreach ($items['_embedded']['items'] as $item) {
                 if ('dir' === $item['type']) {
                     if ($this->pathPrefix) {
                         $path = trim(
@@ -218,10 +211,13 @@ class Client
                         $path = $item['path'];
                     }
 
-                    $deepItems = $this->listContent($path, [], $params['limit'], $params['offset'], $params['preview_crop'], $params['preview_size'], $params['sort'], $deep);
+                    // Remove path arg for a correct catalogue reading.
+                    $arguments = array_slice(func_get_args(), 1);
+                    // Recursive reading.
+                    $deepItems = $this->listContent($path, ...$arguments);
 
-                    foreach ($deepItems as $deepItem) {
-                        $items[] = $deepItem;
+                    foreach ($deepItems['_embedded']['items'] as $deepItem) {
+                        $items['_embedded']['items'][] = $deepItem;
                     }
                 }
             }
