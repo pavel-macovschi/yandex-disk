@@ -17,11 +17,8 @@ use ImpressiveWeb\YandexDisk\Client;
 // Access token.
 $accessToken = 'xxxxxxxxxxxxxxxxxxx';
 
-// Path to a whole disk.
-$pathPrefix = 'disk:/';
-
-// Client init with an access token.
-$client = new Client($accessToken, $pathPrefix);
+// Client init with an access token and default path prefix to a whole disk:/.
+$client = new Client($accessToken);
 ```
 
 ### Go to https://oauth.yandex.ru/client/new create your first App and add necessary permissions.
@@ -35,13 +32,14 @@ $credentials = [
     'client_secret' => 'xxxxxxxxxxxxxxxxxxx',
 ];
 
-// If you create you first APP, use your Application path.
+// Client init with credentials and access to the whole disk.
+// Default value for path prefix is set to disk:/.
+$client = new Client($credentials);
+
+// If you create you first APP, use path of your APP.
 $pathPrefix = 'disk:/Applications/YourApp'
 
-// If you need to use the whole disk.
-$pathPrefix = 'disk:/'
-
-// Client init with credentials.
+// Client init with credentials and access to your Application.
 $client = new Client($credentials, $pathPrefix);
 
 // Create and proceed an auth url to get a code.
@@ -49,6 +47,7 @@ $authUrl = $client->getAuthUrl([
     'redirect_uri' => 'https://your-app'
     // ...other options
 ]);
+
 // After redirecting to your project domain use code from a query.
 // https://your-app?code=xxxxxx
 

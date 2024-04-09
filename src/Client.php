@@ -2,14 +2,11 @@
 
 namespace ImpressiveWeb\YandexDisk;
 
-use GuzzleHttp\Psr7\Request;
+use Exception;
+use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Psr7\Utils;
-use ImpressiveWeb\YandexDisk\BadRequest;
-use GrahamCampbell\GuzzleFactory\GuzzleFactory;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\ClientException;
-use GuzzleHttp\Psr7\PumpStream;
-use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -55,16 +52,16 @@ class Client
      * @param string|array|null $authCredentials
      * @param string $pathPrefix
      * @param int $itemsLimit
-     * @throws \Exception
+     * @throws Exception
      */
     public function __construct(
         string|array $authCredentials = null,
-        private string $pathPrefix = '',
-        private int $itemsLimit = 20
+        private string $pathPrefix = 'disk:/',
+        private readonly int $itemsLimit = 20
     ) {
         if (is_array($authCredentials)) {
             if (empty($authCredentials['client_id']) || empty($authCredentials['client_secret'])) {
-                throw new \Exception('You need to set client_id and client_secret');
+                throw new Exception('You need to set client_id and client_secret');
             }
 
             $this->clientId = $authCredentials['client_id'];
@@ -75,7 +72,7 @@ class Client
             $this->accessToken = $authCredentials;
         }
 
-        $this->client = new GuzzleClient(['handler' => GuzzleFactory::handler()]);
+        $this->client = new GuzzleClient(['base_uri' => self::API_ENDPOINT]);
     }
 
     public function setPathPrefix(string $pathPrefix): void
@@ -93,12 +90,12 @@ class Client
         $this->refreshToken = $refreshToken;
     }
 
-    public function setAccessTokenAddedAt(int $accessTokenAddedAt): void
+    protected function setAccessTokenAddedAt(int $accessTokenAddedAt): void
     {
         $this->accessTokenAddedAt = $accessTokenAddedAt;
     }
 
-    public function setAccessTokenExpiresIn(int $accessTokenExpiresIn): void
+    protected function setAccessTokenExpiresIn(int $accessTokenExpiresIn): void
     {
         $this->accessTokenExpiresIn = $accessTokenExpiresIn;
     }
@@ -122,7 +119,7 @@ class Client
      *
      * @param array $fields Attributes list to be returned.
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function discInfo(array $fields = []): array
     {
@@ -140,7 +137,7 @@ class Client
      * @param array $metaProperties
      * @param array $fields Attributes list to be returned.
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function addMetadata(string $path, array $metaProperties, array $fields = []): array
     {
@@ -170,7 +167,7 @@ class Client
      * @param string $sort Sort field: name | path | created | modified | size
      * @param bool $deep
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function listContent(
         string $path = '/',
@@ -192,29 +189,17 @@ class Client
             'sort'         => $sort
         ];
 
-        // Recursive reading.
         if ($deep) {
             $items = $this->makeRequest('GET', 'resources', $params);
 
             foreach ($items['_embedded']['items'] as $item) {
                 if ('dir' === $item['type']) {
-                    if ($this->pathPrefix) {
-                        $path = trim(
-                            str_replace(
-                                $this->pathPrefix,
-                                '',
-                                $item['path']
-                            ),
-                            '/'
-                        );
-                    } else {
-                        $path = $item['path'];
-                    }
+                    $path = self::trimPath(
+                        str_replace($this->pathPrefix, '', $item['path'])
+                    );
 
-                    // Remove path arg for a correct catalogue reading.
-                    $arguments = array_slice(func_get_args(), 1);
                     // Recursive reading.
-                    $deepItems = $this->listContent($path, ...$arguments);
+                    $deepItems = $this->listContent($path, ...array_slice(func_get_args(), 1));
 
                     foreach ($deepItems['_embedded']['items'] as $deepItem) {
                         $items['_embedded']['items'][] = $deepItem;
@@ -241,7 +226,7 @@ class Client
      * @param string $previewSize S | M | L | XL | XXL | XXXL | 120 | 120x120 | 120x160
      * @param string $sortField Example sorting by size field: (sortField: 'size' - ASC | sortField: '-size' - DESC)
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function listFiles(
         array $fields = [],
@@ -276,7 +261,7 @@ class Client
      * @param bool $previewCrop
      * @param string $previewSize S | M | L | XL | XXL | XXXL | 120 | 120x120 | 120x160
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function listFilesRecentlyAdded(
         array $fields = [],
@@ -303,7 +288,7 @@ class Client
      *
      * @param string $path
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function addDirectory(string $path): array
     {
@@ -325,7 +310,7 @@ class Client
      * @param bool $permanently
      * @param bool $async
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function remove(
         string $path,
@@ -345,7 +330,6 @@ class Client
         return $this->makeRequest('DELETE', 'resources', $params);
     }
 
-
     /**
      * Move a file or a folder to a different location.
      *
@@ -356,7 +340,7 @@ class Client
      * @param bool $overwrite
      * @param bool $async
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function move(string $from, string $to, bool $overwrite = false, bool $async = false): array
     {
@@ -370,7 +354,6 @@ class Client
         return $this->makeRequest('POST', 'resources/move', $params);
     }
 
-
     /**
      * Copy a file or a folder.
      *
@@ -381,7 +364,7 @@ class Client
      * @param bool $overwrite
      * @param bool $async
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function copy(string $from, string $to, bool $overwrite = false, bool $async = false): array
     {
@@ -403,7 +386,7 @@ class Client
      * @param string $path
      * @param array $fields Attributes list to be returned.
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function getDownloadUrl(string $path, array $fields = []): array
     {
@@ -424,7 +407,7 @@ class Client
      * @param bool $overwrite
      * @param array $fields Attributes list to be returned.
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function getUploadUrl(string $path, bool $overwrite = false, array $fields = []): array
     {
@@ -448,8 +431,7 @@ class Client
     }
 
     /**
-     * Upload a file or a folder.
-     *
+     * Upload a file or a folder at a given path.
      *
      * @see https://yandex.ru/dev/disk/api/reference/upload.html#response-upload
      *
@@ -457,9 +439,9 @@ class Client
      * @param $contents
      * @param bool $overwrite
      * @return ResponseInterface
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
-    public function upload(string $toPath, $contents, bool $overwrite = false)
+    public function upload(string $toPath, $contents, bool $overwrite = false): ResponseInterface
     {
         $data = $this->getUploadUrl($toPath, $overwrite, ['href']);
         $url = $data['href'];
@@ -484,7 +466,6 @@ class Client
             unset($contents);
         }
 
-
         return $result;
     }
 
@@ -496,26 +477,26 @@ class Client
      * @param array $fields Attributes list to be returned.
      * @param int $limit
      * @param int $offset
-     * @param bool $preview_crop
-     * @param string $preview_size S | M | L | XL | XXL | XXXL | 120 | 120x120 | 120x160
+     * @param bool $previewCrop
+     * @param string $previewSize S | M | L | XL | XXL | XXXL | 120 | 120x120 | 120x160
      * @param string $type
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function listPublishedResources(
         array $fields = [],
         int $limit = 20,
         int $offset = 0,
-        bool $preview_crop = false,
-        string $preview_size = 'S',
+        bool $previewCrop = false,
+        string $previewSize = 'S',
         string $type = ''
     ): array {
         $params = [
             'fields'       => implode(',', $fields),
             'limit'        => $this->getLimit($limit),
             'offset'       => $offset,
-            'preview_crop' => $preview_crop,
-            'preview_size' => $preview_size,
+            'preview_crop' => $previewCrop,
+            'preview_size' => $previewSize,
             'type'         => $type,
         ];
 
@@ -530,7 +511,7 @@ class Client
      * @param string $path
      * @param array $fields Attributes list to be returned.
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function resourcePublish(string $path, array $fields = []): array
     {
@@ -547,7 +528,7 @@ class Client
      *
      * @see https://yandex.ru/dev/disk/api/reference/publish.html#unpublish-q
      *
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function resourceUnpublish(string $path, array $fields = []): array
     {
@@ -567,11 +548,11 @@ class Client
      * @param array $fields Attributes list to be returned.
      * @param int $limit
      * @param int $offset
-     * @param bool $preview_crop
-     * @param string $preview_size S | M | L | XL | XXL | XXXL | 120 | 120x120 | 120x160
+     * @param bool $previewCrop
+     * @param string $previewSize S | M | L | XL | XXL | XXXL | 120 | 120x120 | 120x160
      * @param string $sort
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function resourceMetadata(
         string $publicKeyOrUrl,
@@ -579,8 +560,8 @@ class Client
         array $fields = [],
         int $limit = 20,
         int $offset = 0,
-        bool $preview_crop = false,
-        string $preview_size = 'S',
+        bool $previewCrop = false,
+        string $previewSize = 'S',
         string $sort = ''
     ): array {
         $params = [
@@ -589,8 +570,8 @@ class Client
             'fields'       => implode(',', $fields),
             'limit'        => $this->getLimit($limit),
             'offset'       => $offset,
-            'preview_crop' => $preview_crop,
-            'preview_size' => $preview_size,
+            'preview_crop' => $previewCrop,
+            'preview_size' => $previewSize,
             'type'         => $sort,
         ];
 
@@ -604,7 +585,7 @@ class Client
      * @param array $fields Attributes list to be returned.
      * @param string $path
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function resourceDownloadUrl(
         string $publicKeyOrUrl,
@@ -630,7 +611,7 @@ class Client
      * @param array $fields Attributes list to be returned.
      * @param bool $forceAsync
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function resourceSaveToDisk(
         string $publicKeyOrUrl,
@@ -666,7 +647,7 @@ class Client
      * @param string $previewSize S | M | L | XL | XXL | XXXL | 120 | 120x120 | 120x160
      * @param string $sort created | deleted
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function trashListContent(
         string $path = '/',
@@ -701,7 +682,7 @@ class Client
      * @param string $name A new name of recovered resource
      * @param bool $overwrite
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function trashContentRestore(
         string $path,
@@ -730,7 +711,7 @@ class Client
      * @param array $fields Attributes list to be returned.
      * @param bool $forceAsync
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function trashContentDelete(string $path, array $fields = [], bool $forceAsync = false): array
     {
@@ -751,7 +732,7 @@ class Client
      * @param array $fields Attributes list to be returned.
      * @param bool $forceAsync
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function trashClear(array $fields = [], bool $forceAsync = false): array
     {
@@ -772,7 +753,7 @@ class Client
      * @param int $id
      * @param array $fields Attributes list to be returned.
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function statusOperation(int $id, array $fields = []): array
     {
@@ -819,7 +800,8 @@ class Client
      * @param string $subdomain
      * @param array $params
      * @return mixed
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
+     * @throws Exception
      */
     private function makeRequest(string $method, string $subdomain = '', array $params = []): mixed
     {
@@ -846,8 +828,8 @@ class Client
             if (!empty($subdomain)) {
                 $subdomain .= '/';
             }
-            $uri = self::API_ENDPOINT . $subdomain;
-            $response = $this->client->request($method, $uri, $options);
+
+            $response = $this->client->request($method, $subdomain, $options);
         } catch (ClientException $e) {
             throw $this->handleException($e);
         }
@@ -857,9 +839,9 @@ class Client
 
     /**
      * @param ClientException $exception
-     * @return \Exception
+     * @return Exception
      */
-    private function handleException(ClientException $exception): \Exception
+    private function handleException(ClientException $exception): Exception
     {
         $response = $exception->getResponse();
         $statusCode = $response->getStatusCode();
@@ -867,7 +849,7 @@ class Client
         $message = $body['description'];
 
         if (in_array($statusCode, self::CODE_STATUSES)) {
-            return new \Exception($message);
+            return new Exception($message);
         }
 
         return $exception;
@@ -902,7 +884,7 @@ class Client
      * @param string $deviceName
      * @param string $codeVerifier
      * @return mixed
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function authCodeAndGetToken(
         string $code,
@@ -927,6 +909,8 @@ class Client
         } catch (ClientException $e) {
             echo $e->getMessage();
         }
+
+        return false;
     }
 
     private function getHeaders(): array
@@ -944,7 +928,8 @@ class Client
      */
     private function getLimit($limit): int
     {
-        return $limit > $this->itemsLimit ? $limit : $this->itemsLimit;
+        return max($limit, $this->itemsLimit);
+//        return $limit > $this->itemsLimit ? $limit : $this->itemsLimit;
     }
 
     /**
@@ -959,7 +944,7 @@ class Client
     /**
      * @see https://yandex.ru/dev/id/doc/ru/tokens/refresh-client
      *
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     private function refreshAccessToken(): void
     {
@@ -990,6 +975,6 @@ class Client
     {
         $expiresIn = $this->accessTokenAddedAt + $this->accessTokenExpiresIn;
 
-        return time() > $expiresIn ? true : false;
+        return time() > $expiresIn;
     }
 }
