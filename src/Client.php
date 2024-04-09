@@ -857,6 +857,8 @@ class Client
     }
 
     /**
+     * Authorize credentials to get a confirmation code.
+     *
      * @see https://yandex.ru/dev/id/doc/ru/codes/code-url
      *
      * @param array $options extra query parameters
@@ -876,6 +878,8 @@ class Client
     }
 
     /**
+     * Authorize and exchange code for getting an OAuth token.
+     *
      * @see https://yandex.ru/dev/id/doc/ru/codes/code-url#token
      *
      * Returns access and refresh tokens.
