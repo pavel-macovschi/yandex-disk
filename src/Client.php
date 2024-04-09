@@ -8,6 +8,7 @@ use GuzzleHttp\Psr7\Utils;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\ClientException;
 use Psr\Http\Message\ResponseInterface;
+use ImpressiveWeb\YandexDisk\Exception\BadRequestException;
 
 /**
  * @see https://yandex.com/dev/disk/poligon/
@@ -849,7 +850,7 @@ class Client
         $message = $body['description'];
 
         if (in_array($statusCode, self::CODE_STATUSES)) {
-            return new Exception($message);
+            return new BadRequestException($message);
         }
 
         return $exception;
