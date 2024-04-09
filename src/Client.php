@@ -929,7 +929,6 @@ class Client
     private function getLimit($limit): int
     {
         return max($limit, $this->itemsLimit);
-//        return $limit > $this->itemsLimit ? $limit : $this->itemsLimit;
     }
 
     /**
