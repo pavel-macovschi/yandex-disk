@@ -906,12 +906,12 @@ class Client
 
         try {
             $response = $this->client->post(self::API_AUTH_URL . 'token', $params);
-            return $this->decodeContents($response);
+            $data = $this->decodeContents($response);
         } catch (ClientException $e) {
             echo $e->getMessage();
         }
 
-        return false;
+        return $data;
     }
 
     private function getHeaders(): array
