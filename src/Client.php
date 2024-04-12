@@ -775,10 +775,10 @@ class Client
             return $path;
         }
 
-        $path = trim($path, '/ ');
+        $path = self::trimPath($path);
 
         if ($this->pathPrefix) {
-            $path = trim($this->pathPrefix, '/') . '/' . $path;
+            $path = self::trimPath($this->pathPrefix) . '/' . $path;
         }
 
         return $path;
@@ -792,7 +792,7 @@ class Client
      */
     private static function trimPath(string $path): string
     {
-        return trim($path, '/\\');
+        return trim($path, './\\');
     }
 
     /**
