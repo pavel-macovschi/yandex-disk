@@ -8,6 +8,7 @@ use GuzzleHttp\Psr7\Utils;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\ClientException;
 use Psr\Http\Message\ResponseInterface;
+use ImpressiveWeb\YandexDisk\Exception\BadRequestException;
 
 /**
  * @see https://yandex.com/dev/disk/poligon/
@@ -849,13 +850,15 @@ class Client
         $message = $body['description'];
 
         if (in_array($statusCode, self::CODE_STATUSES)) {
-            return new Exception($message);
+            return new BadRequestException($message);
         }
 
         return $exception;
     }
 
     /**
+     * Authorize credentials to get a confirmation code.
+     *
      * @see https://yandex.ru/dev/id/doc/ru/codes/code-url
      *
      * @param array $options extra query parameters
@@ -875,6 +878,8 @@ class Client
     }
 
     /**
+     * Authorize and exchange code for getting an OAuth token.
+     *
      * @see https://yandex.ru/dev/id/doc/ru/codes/code-url#token
      *
      * Returns access and refresh tokens.
@@ -905,12 +910,12 @@ class Client
 
         try {
             $response = $this->client->post(self::API_AUTH_URL . 'token', $params);
-            return $this->decodeContents($response);
+            $data = $this->decodeContents($response);
         } catch (ClientException $e) {
             echo $e->getMessage();
         }
 
-        return false;
+        return $data;
     }
 
     private function getHeaders(): array
@@ -929,7 +934,6 @@ class Client
     private function getLimit($limit): int
     {
         return max($limit, $this->itemsLimit);
-//        return $limit > $this->itemsLimit ? $limit : $this->itemsLimit;
     }
 
     /**
