@@ -223,7 +223,7 @@ array:4 [▼
   "method" => "PUT"
   "templated" => false
 ]
-// If href in reply data will not be requested for 30 minutes it won't be available for uploading and you need to create another one.
+// If href in reply data will not be requested for 30 minutes it won't be available for uploading, and you need to create another one.
 
 // 2. Use href however you want. 
 
@@ -265,4 +265,4 @@ $client->trashClear();
 
 # If you need to use a common interface among different filesystems you can use Flysystem: https://flysystem.thephpleague.com/docs/
 
-## This Flysystem Adapter: https://packagist.org/packages/impressiveweb/yandex-disk-flysystem-adapter if fully compatible with this version of Yandex Disk API.
+## This Flysystem Adapter: https://packagist.org/packages/impressiveweb/yandex-disk-flysystem-adapter is fully compatible with this version of Yandex Disk API.
