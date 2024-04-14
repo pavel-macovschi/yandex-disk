@@ -44,7 +44,7 @@ $client = new Client($credentials, $pathPrefix);
 
 // Create and proceed an auth url to get a code.
 $authUrl = $client->getAuthUrl([
-    'redirect_uri' => 'https://your-app'
+    'redirect_uri' => 'https://your-domain-app'
     // ...other options
 ]);
 
@@ -65,17 +65,18 @@ array:4 [▼
   "token_type" => "bearer"
 ]
 
-// If it is successful you'll get both tokens.
+// If reply has been successful you've got both tokens.
 $accessToken = $reply['access_token'];
 
-// Save a refresh token somewhere securely to use it in farther requests.
+// Save a refresh token somewhere in a secret place.
 $refreshToken = $reply['refresh_token'];
 
-// Refresh token should be set to make sure an access token update.
+// Refresh token should be set to make sure an automatic access token update.
 $client->setRefreshToken($refreshToken); 
+
 ```
 
-## Here are several examples of API usage.
+# Here are several examples of API usage.
 
 ### Get a disk meta information.
 
@@ -258,6 +259,10 @@ $client->trashClear();
 
 ```
 
-### Some other methods are self-descriptive and easy to understand because the most of them are similar to original API.
+### Some other methods are self-descriptive and easy to understand because the most of them are similar to an original Yandex Disk API.
 
 ### Read an official API documentation https://yandex.ru/dev/disk-api/doc/ru/ to get more details how to use methods and its arguments.
+
+# If you need to use a common interface among different filesystems you can use Flysystem: https://flysystem.thephpleague.com/docs/
+
+## This Flysystem Adapter: https://packagist.org/packages/impressiveweb/yandex-disk-flysystem-adapter if fully compatible with this version of Yandex Disk API.
