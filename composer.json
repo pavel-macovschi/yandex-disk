@@ -4,6 +4,15 @@
     "homepage": "https://github.com/pavel-macovschi/yandex-disk-api",
     "license": "MIT",
     "minimum-stability": "dev",
+    "keywords": [
+        "impressiveweb",
+        "yandex",
+        "yandex disk",
+        "yandex disk api",
+        "yandex-disk-api",
+        "yandex cloud",
+        "api"
+    ],
     "authors": [
         {
             "name": "Pavel Macovschi",
