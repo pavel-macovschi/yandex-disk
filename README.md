@@ -265,4 +265,4 @@ $client->trashClear();
 
 # If you need to use a common interface among different filesystems you can use Flysystem: https://flysystem.thephpleague.com/docs/
 
-## This Flysystem Adapter: https://packagist.org/packages/impressiveweb/yandex-disk-flysystem-adapter is fully compatible with this version of Yandex Disk API.
+## This Flysystem Adapter: https://packagist.org/packages/impressiveweb/yandex-disk-flysystem is fully compatible with this version of Yandex Disk API.
